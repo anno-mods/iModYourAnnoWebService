@@ -1,0 +1,74 @@
+service: anno-mods-ratings
+# app and org for use with dashboard.serverless.com
+app: anno-mods-ratings
+org: etiennedx
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: eu-west-1
+  stage: prod
+  environment:
+    MODS_RATINGS_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "*"
+
+resources:
+  Resources:
+    CandidatesDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"   
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
+        TableName: ${self:provider.environment.MODS_RATINGS_TABLE}
+
+
+functions:
+  likeMod:
+    handler: api/mod.like
+    memorySize: 128
+    description: Likes a mod using user uuid
+    events:
+      - http:
+          path: like
+          method: post
+  unlikeMod:
+    handler: api/mod.unlike
+    memorySize: 128
+    description: Unlikes a mod using user uuid
+    events:
+      - http:
+          path: unlike
+          method: post
+  listRatings:
+    handler: api/mod.list
+    memorySize: 128
+    description: Lists mods ratings
+    events:
+      - http:
+          path: list
+          method: get
