@@ -6,8 +6,29 @@ on:
       - master
 
 jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./anno-mods-ratings-service
+    steps:
+      # Checkout the Repo
+      - uses: actions/checkout@v2
+
+      # Install Node 16
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16
+
+      # Install dependencies
+      - run: npm ci
+
+      # Run tests
+      - run: npm test
   deploy:
     name: deploy
+    needs: tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,7 +43,7 @@ jobs:
     - name: serverless deploy
       uses: serverless/github-action@v3
       with:
-        args: deploy
+        args: deploy -c ./anno-mods-ratings-service/serverless.yml
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
