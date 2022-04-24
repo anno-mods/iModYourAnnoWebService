@@ -1,10 +1,14 @@
 'use strict';
 
-const AWS = require('aws-sdk'); 
+const AWS = require('aws-sdk');
+
+const config = process.env.JEST_WORKER_ID ? {
+  endpoint: 'localhost:8000',
+  sslEnabled: false,
+  region: 'local-env',
+} : undefined;
  
-AWS.config.setPromisesDependency(require('bluebird'));
- 
-const dynamoDb = new AWS.DynamoDB.DocumentClient();
+const dynamoDb = new AWS.DynamoDB.DocumentClient(config);
 
 module.exports.like = (event, context, callback) => {
   const requestBody = JSON.parse(event.body);
@@ -43,12 +47,14 @@ module.exports.like = (event, context, callback) => {
       return;
     }
 
+    const likesCount = data && data.Attributes && data.Attributes.likes ? data.Attributes.likes.values.length : 0;
+
     const response = {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
         modId: modId,
-        likesCount: data.Attributes.likes.values.length,
+        likesCount: likesCount,
       }),
     };
     
@@ -82,7 +88,7 @@ module.exports.unlike = (event, context, callback) => {
     },
     ReturnValues: 'ALL_NEW',
   }, (err, data) => {
-    if(err && err.code !== 'ResourceNotFoundException') {
+    if(err) {
       callback(null, {
         statusCode: 500,
         body: JSON.stringify({
@@ -93,12 +99,14 @@ module.exports.unlike = (event, context, callback) => {
       return;
     }
 
+    const likesCount = data && data.Attributes && data.Attributes.likes ? data.Attributes.likes.values.length : 0;
+
     const response = {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
         modId: modId,
-        likesCount: data.Attributes.likes.values.length,
+        likesCount: likesCount,
       }),
     };
     

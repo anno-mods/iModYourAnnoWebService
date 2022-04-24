@@ -1,0 +1,19 @@
+{
+  "name": "anno-mods-ratings-service",
+  "version": "1.0.0",
+  "description": "A service for storing and sharing ratings of Anno 1800 mods",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.76.0",
+    "aws-sdk": "^2.1120.0"
+  },
+  "devDependencies": {
+    "@shelf/jest-dynamodb": "^2.2.3",
+    "jest": "^27.5.1",
+    "js-yaml": "^4.1.0"
+  },
+  "scripts": {
+    "test": "jest --forceExit"
+  },
+  "author": "EtienneDx",
+  "license": "MIT"
+}

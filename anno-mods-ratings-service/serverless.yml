@@ -27,7 +27,7 @@ provider:
 
 resources:
   Resources:
-    CandidatesDynamoDbTable:
+    ModsRatingsTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Retain
       Properties:
