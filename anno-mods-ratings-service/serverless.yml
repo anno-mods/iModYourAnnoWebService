@@ -2,6 +2,11 @@ service: anno-mods-ratings
 
 frameworkVersion: '3'
 
+custom:
+  deletionPolicy:
+    dev: Delete
+    prod: Retain
+
 provider:
   name: aws
   runtime: nodejs12.x
@@ -26,7 +31,7 @@ resources:
   Resources:
     ModsRatingsTable:
       Type: 'AWS::DynamoDB::Table'
-      DeletionPolicy: Retain
+      DeletionPolicy: ${self:custom.deletionPolicy.${opt:stage, self:provider.stage}}
       Properties:
         AttributeDefinitions:
           -
