@@ -24,6 +24,14 @@ jobs:
       # Install dependencies
       - run: npm ci
 
+      # Setup AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+
       # Run tests
       - run: npm test
   deploy:
@@ -34,16 +42,15 @@ jobs:
       run:
         working-directory: ./anno-mods-ratings-service
     steps:
-    - uses: actions/checkout@v2
-    - name: Use Node.js 16.x
-      uses: actions/setup-node@v1
-      with:
-        node-version: 16.x
-    - run: npm ci
-    - name: serverless deploy
-      uses: serverless/github-action@v3
-      with:
-        args: deploy -c ./anno-mods-ratings-service/serverless.yml
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - uses: actions/checkout@v2
+      - name: Use Node.js 16.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+      - run: npm ci
+      - run: node ./node_modules/serverless/bin/serverless.js config credentials --provider aws --key ${{ secrets.AWS_ACCESS_KEY_ID }} --secret ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - run: node ./node_modules/serverless/bin/serverless.js deploy --stage prod --verbose
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          SLS_DEBUG: 1
