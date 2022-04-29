@@ -7,3 +7,6 @@ jspm_packages
 
 # jest coverage directory
 coverage
+
+# build directory
+build

@@ -1,10 +1,11 @@
 const { it, expect, beforeAll, afterAll } = require('@jest/globals');
 const yaml = require('js-yaml');
 const fs   = require('fs');
+const debug = require('debug')('imya:mod');
 
 const AWS = require('aws-sdk');
 
-const mod = require('../api/mod');
+const mod = require('../build/mod');
 
 const doc = yaml.load(fs.readFileSync('./serverless.yml', 'utf8'));
 
@@ -12,38 +13,54 @@ const config = process.env.JEST_WORKER_ID ? {
   endpoint: 'localhost:8000',
   sslEnabled: false,
   region: 'local-env',
+  maxRetries: 0,
+  httpOptions: {
+    connectTimeout: 500,
+    timeout: 500,
+  },
 } : undefined;
  
 const dynamoDb = new AWS.DynamoDB(config);
 
-beforeAll((done) => {
+const dynamoDbEnabled = false;
+
+beforeAll(async () => {
   process.env.MODS_RATINGS_TABLE = 'TEST_TABLE';
+  debug('Deleting old table');
   try {
-    dynamoDb.createTable({
+  await dynamoDb.deleteTable({ TableName: process.env.MODS_RATINGS_TABLE }).promise();
+  } catch (e) {
+    debug("No table to delete");
+  }
+  debug('Creating table');
+  try {
+    await dynamoDb.createTable({
       TableName: process.env.MODS_RATINGS_TABLE,
       KeySchema: doc.resources.Resources.ModsRatingsTable.Properties.KeySchema,
       AttributeDefinitions: doc.resources.Resources.ModsRatingsTable.Properties.AttributeDefinitions,
       ProvisionedThroughput: {ReadCapacityUnits: 1, WriteCapacityUnits: 1},
-    }, done);
-  } catch (err) {
-    done(err);
+    }).promise();
+    await dynamoDb.waitFor('tableExists', { TableName: process.env.MODS_RATINGS_TABLE }).promise();
+    dynamoDbEnabled = true;
+  } catch (e) {
+    debug('Couldn\'t create table: %s', e.message);
+    debug('Skipping tests requiring the DynamoDB table');
   }
 });
 
-afterAll(done => {
+afterAll(async () => {
   try {
-    console.log("Deleting table");
-    dynamoDb.deleteTable({
+    debug("Deleting table");
+    await dynamoDb.deleteTable({
       TableName: process.env.MODS_RATINGS_TABLE,
-    }, done);
+    }).promise();
   } catch (err) {
-    console.log("Error deleting table");
-    done(err);
+    debug("Error deleting table");
   }
 });
 
-describe('successful usage', () => {
-  it('should successfully like "modId"', (done) => {
+describe('should succeed', () => {
+  it('like function', async () => {
     const userId = 'userId';
     const modId = 'modId';
     const requestBody = {
@@ -53,83 +70,185 @@ describe('successful usage', () => {
     const event = {
       body: JSON.stringify(requestBody),
     };
-    const context = {};
     
-    mod.like(event, context, (error, response) => {
-      try {
-        expect(error).toBeNull();
-        expect(JSON.parse(response.body)).toStrictEqual({
-          success: true,
+    const response = await mod.like(event);
+    expect(JSON.parse(response.body)).toStrictEqual({
+      success: true,
+      modId,
+      likesCount: 1,
+    });
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('unlike function', async () => {
+    const userId = 'userId';
+    const modId = 'modId';
+    const requestBody = {
+      userId,
+      modId,
+    };
+    const event = {
+      body: JSON.stringify(requestBody),
+    };
+    
+    const response = await mod.unlike(event);
+    expect(JSON.parse(response.body)).toStrictEqual({
+      success: true,
+      modId,
+      likesCount: 0,
+    });
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('list function', async () => {
+    const userId = 'userId';
+    const modId = 'modId';
+    const requestBody = {
+      userId,
+      modId,
+    };
+    const event = {
+      body: JSON.stringify(requestBody),
+    };
+    
+    await mod.like(event, {}, () => {});
+    
+    const response = await mod.list({});
+    expect(JSON.parse(response.body)).toStrictEqual({
+      success: true,
+      mods: [
+        {
           modId,
           likesCount: 1,
-        });
-        expect(response.statusCode).toBe(200);
-        done();
-      } catch (err) {
-        done(err);
-      }
+        },
+      ],
+    });
+    expect(response.statusCode).toBe(200);
+  });
+});
+
+describe('should fail', () => {
+  describe("like function", () => {
+    it('when missing modId', async () => {
+      const userId = 'userId';
+      const requestBody = {
+        userId,
+      };
+      const event = {
+        body: JSON.stringify(requestBody),
+      };
+      
+      const response = await mod.like(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('when missing userId', async () => {
+      const modId = 'modId';
+      const requestBody = {
+        modId,
+      };
+      const event = {
+        body: JSON.stringify(requestBody),
+      };
+      
+      const response = await mod.like(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('when userId is not a string', async () => {
+      const userId = 1;
+      const modId = 'modId';
+      const requestBody = {
+        userId,
+        modId,
+      };
+      const event = {
+        body: JSON.stringify(requestBody),
+      };
+      
+      const response = await mod.like(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('when no body is provided', async () => {
+      const event = {};
+      
+      const response = await mod.like(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
     });
   });
 
-  it('should successfully unlike "modId"', (done) => {
-    const userId = 'userId';
-    const modId = 'modId';
-    const requestBody = {
-      userId,
-      modId,
-    };
-    const event = {
-      body: JSON.stringify(requestBody),
-    };
-    const context = {};
-    const callback = jest.fn();
-    
-    mod.unlike(event, context, (error, response) => {
-      try {
-        expect(error).toBeNull();
-        expect(JSON.parse(response.body)).toStrictEqual({
-          success: true,
-          modId,
-          likesCount: 0,
-        });
-        expect(response.statusCode).toBe(200);
-        done();
-      } catch (err) {
-        done(err);
-      }
+  describe("unlike function", () => {
+    it('when missing modId', async () => {
+      const userId = 'userId';
+      const requestBody = {
+        userId,
+      };
+      const event = {
+        body: JSON.stringify(requestBody),
+      };
+      
+      const response = await mod.unlike(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
     });
-  });
 
-  it('should successfully get "modId" likes', (done) => {
-    const userId = 'userId';
-    const modId = 'modId';
-    const requestBody = {
-      userId,
-      modId,
-    };
-    const event = {
-      body: JSON.stringify(requestBody),
-    };
-    
-    mod.like(event, {}, () => {});
-    
-    mod.list({}, {}, (error, response) => {
-      try {
-        expect(error).toBeNull();
-        expect(JSON.parse(response.body)).toStrictEqual({
-          success: true,
-          mods: [
-            {
-              modId,
-              likesCount: 1,
-            },
-          ],
-        });
-        expect(response.statusCode).toBe(200);
-        done();
-      } catch (err) {
-        done(err);
-      }
+    it('when missing userId', async () => {
+      const modId = 'modId';
+      const requestBody = {
+        modId,
+      };
+      const event = {
+        body: JSON.stringify(requestBody),
+      };
+      
+      const response = await mod.unlike(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('when userId is not a string', async () => {
+      const userId = 1;
+      const modId = 'modId';
+      const requestBody = {
+        userId,
+        modId,
+      };
+      const event = {
+        body: JSON.stringify(requestBody),
+      };
+      
+      const response = await mod.unlike(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('when no body is provided', async () => {
+      const event = {};
+      
+      const response = await mod.unlike(event);
+      expect(JSON.parse(response.body)).toStrictEqual({
+        message: "Invalid request body",
+      });
+      expect(response.statusCode).toBe(400);
     });
   });
 });

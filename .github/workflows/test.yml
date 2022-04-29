@@ -3,6 +3,10 @@ on:
   pull_request:
     branches:
       - master
+    paths:
+      - .github/workflows/test.yml
+      - ./anno-mods-ratings-service/**
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -10,8 +14,13 @@ jobs:
       run:
         working-directory: ./anno-mods-ratings-service
     steps:
+      # Start dynamoDb as soon as possible to reduce startup waiting time
+      - name: Setup local DynamoDB
+        run: docker run -p 8000:8000 amazon/dynamodb-local &
+
       # Checkout the Repo
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
 
       # Install Node 16
       - name: Setup Node
@@ -20,7 +29,8 @@ jobs:
           node-version: 16
 
       # Install dependencies
-      - run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
       # Setup AWS credentials
       - name: Configure AWS Credentials
@@ -28,6 +38,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Build project
+        run: npm run build
+
+      # Wait for dynamoDb to boot
+      - name: Wait for dynamoDb to boot up
+        run: node ./wait-for-dynamodb.js
 
       # Run tests
       - run: npm test

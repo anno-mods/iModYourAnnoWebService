@@ -12,6 +12,8 @@ provider:
   runtime: nodejs12.x
   region: eu-west-1
   stage: prod
+  apiName: ${self:service}-${opt:stage, self:provider.stage}
+  versionFunctions: false # Don't version function, as the goal is to remain as lightweight and uniform as possible
   environment:
     MODS_RATINGS_TABLE: ${self:service}-${opt:stage, self:provider.stage}
   iam:
@@ -51,26 +53,26 @@ resources:
 
 functions:
   likeMod:
-    handler: api/mod.like
+    handler: build/mod.like
     memorySize: 128
     description: Likes a mod using user uuid
     events:
-      - http:
-          path: like
+      - httpApi:
+          path: /like
           method: post
   unlikeMod:
-    handler: api/mod.unlike
+    handler: build/mod.unlike
     memorySize: 128
     description: Unlikes a mod using user uuid
     events:
-      - http:
-          path: unlike
+      - httpApi:
+          path: /unlike
           method: post
   listRatings:
-    handler: api/mod.list
+    handler: build/mod.list
     memorySize: 128
     description: Lists mods ratings
     events:
-      - http:
-          path: list
+      - httpApi:
+          path: /list
           method: get
