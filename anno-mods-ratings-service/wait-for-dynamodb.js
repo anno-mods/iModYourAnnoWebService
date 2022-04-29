@@ -1,7 +1,16 @@
-import timers from 'timers/promises'
-import AWS from 'aws-sdk'
+const timers = require('timers-promises');
+const AWS = require('aws-sdk');
 
-const dynamodb = new AWS.DynamoDB()
+const dynamodb = new AWS.DynamoDB({
+    endpoint: 'localhost:8000',
+    sslEnabled: false,
+    region: 'local-env',
+    maxRetries: 0,
+    httpOptions: {
+      connectTimeout: 500,
+      timeout: 500,
+    },
+})
 
 // Allow up to 10 seconds for dynamodb to start
 let retries = 10;

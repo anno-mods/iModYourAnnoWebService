@@ -19,6 +19,7 @@ jobs:
       # Start dynamoDb as soon as possible to reduce startup waiting time
       - name: Setup local DynamoDB
         run: docker run -p 8000:8000 amazon/dynamodb-local &
+        working-directory: .
 
       # Checkout the Repo
       - name: Checkout
@@ -40,6 +41,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
 
       - name: Build project
         run: npm run build
